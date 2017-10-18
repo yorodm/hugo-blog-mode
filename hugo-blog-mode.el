@@ -34,7 +34,8 @@
 
 ;;; Code
 
-(require 'vc-git)
+(require 'git)
+(require 'url-parse)
 (require 'simple-httpd)
 (defgroup hugo-blog nil
   "Hugo blog mode customizations"
@@ -55,11 +56,15 @@
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-develop-url ""
+(defcustom hugo-blog-preview-url ""
   "Blog's local URL"
   :group 'hugo-blog
   :type 'string)
 
+(defcustom hugo-blog-internal-server t
+  "Non nil means use internal server for preview"
+  :group 'hugo-blog
+  :type 'boolean)
 
 (defcustom hugo-blog-publish-branch "master"
   "Git branch of published mode"
@@ -71,25 +76,52 @@
   :group 'hugo-blog
   :type 'string)
 
+(defmacro with-git-repo (repo &rest body)
+  "A simple way of not to mess with `git-repo' in `git.el'"
+  `(let ((git-repo ,repo))
+     ,@body))
+
 (defun hugo-blog-run-command (command parameters)
   "Runs COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
    Returns the command's output as a string"
   (cd hugo-blog-project)
   (shell-command-to-string (concat command  " " parameters)))
 
+(defun hugo-blog--switch-to-preview ()
+  "Changes to the preview branch keeping all the changes"
+  (cd hugo-blog-project)
+  (with-git-repo hugo-blog-project
+  (when (git-on-branch? hugo-blog-publish-branch)
+    (git-add)
+    (git-stash (concat "WIP: Switching to preview "
+                       (time-stamp-string)))
+    (unless (member hugo-blog-preview-branch (git-branches))
+      (git-branch hugo-blog-preview-branch))
+    (git-checkout hugo-blog-preview-branch)
+    (git-stash-pop))))
+
 ;;;###autoload
 (defun hugo-blog-new (archetype)
   "Creates new content in your hugo site"
   (interactive "sNew content path: ")
+  (hugo-blog--switch-to-preview)
   (let ((output (hugo-blog-run-command "new" archetype)))
     (find-file-existing  (car (split output " ")))))
 
 ;;;###autoload
 (defun hugo-blog-preview ()
+  "Launches a preview HTTP server"
   (interactive)
-  (when (git-on-branch? hugo-blog-publish-branch)
-    (git-stash "WIP: Switching to preview on"))
-  (unless ))
+  (hugo-blog--switch-to-preview)
+  (hugo-blog-run-command  "-b " hugo-blog-preview-url)
+  (when hugo-blog-internal-server
+    (let ((url (url-generic-parse-url hugo-blog-preview-url)))
+      ;; We love CL
+      (setq httpd-root hugo-blog-project)
+      (setq httpd-host (url-host url))
+      (setq httpd-port (url-port url))
+      (httpd-start)
+      (browse-url hugo-blog-preview-url))))
 
 ;;;###autoload
 (defun hugo-blog-init (directory)
