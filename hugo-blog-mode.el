@@ -29,19 +29,20 @@
 
 ;;; Comentary:
 
-;; This package provides an improvement over the usual way to use the ant
-;; build tool throught `compile'
+;; A little helper package to manage my static blog using hugo
 
 ;;; Code
 
 (require 'git)
 (require 'url-parse)
 (require 'simple-httpd)
+
+
 (defgroup hugo-blog nil
   "Hugo blog mode customizations"
   :group 'tools)
 
-(defcustom hugo-blog-command ""
+(defcustom hugo-blog-command "hugo"
   "Path to hugo's executable "
   :group 'hugo-blog
   :type 'string)
@@ -93,12 +94,13 @@
   (with-git-repo hugo-blog-project
   (when (git-on-branch? hugo-blog-publish-branch)
     (git-add)
-    (git-stash (concat "WIP: Switching to preview "
-                       (time-stamp-string)))
+    (let ((have-stash (git-stash (concat "WIP: Switching to preview "
+                                         (current-time-string)))))
     (unless (member hugo-blog-preview-branch (git-branches))
       (git-branch hugo-blog-preview-branch))
     (git-checkout hugo-blog-preview-branch)
-    (git-stash-pop))))
+    (when have-stash
+      (git-stash-pop))))))
 
 ;;;###autoload
 (defun hugo-blog-new (archetype)
@@ -117,15 +119,13 @@
   (when hugo-blog-internal-server
     (let ((url (url-generic-parse-url hugo-blog-preview-url)))
       ;; We love CL
-      (setq httpd-root hugo-blog-project)
+      (setq httpd-root
+            (concat hugo-blog-project
+                    (f-path-separator) "public"))
       (setq httpd-host (url-host url))
       (setq httpd-port (url-port url))
       (httpd-start)
       (browse-url hugo-blog-preview-url))))
-
-;;;###autoload
-(defun hugo-blog-init (directory)
-  (interactive))
 
 (provide 'hugo-blog-mode)
 
