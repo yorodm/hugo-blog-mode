@@ -127,6 +127,9 @@
       (httpd-start)
       (browse-url hugo-blog-preview-url))))
 
+(defun hugo-blog-publish ()
+  (interactive))
+
 (provide 'hugo-blog-mode)
 
 ;;; hugo-blog-mode.el ends here
