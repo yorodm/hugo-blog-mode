@@ -144,6 +144,46 @@
           (browse-url hugo-blog-preview-url)))
     (error "Command hugo returned an error, check your configuration")))
 
+(defun hugo-blog--commit-all (branch)
+  (with-git-repo hugo-blog-project
+  (when (git-untracked-files)
+    (git-add)
+    (git-commit (concat "Commit on " branch " :" (current-time-string)))
+    (with-git-repo (concat hugo-blog-project (f-path-separator) "public")
+               (git-add)
+               (git-commit (concat "Commit on " branch ":" (current-time-string)))))))
+
+(defun hugo-blog--merge-master ()
+  "Merges develop into master"
+  (when (git-untracked-files)
+    (error (concat "There are untracked files in " hugo-blog-publish-branch)))
+  (with-git-repo hugo-blog-project
+                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
+                                                         (current-time-string)))
+                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
+                                (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
+                                                                        (current-time-string))))))
+
+(defun hugo-blog--switch-to-master ()
+  "Commits everything into develop and switches back to master"
+  (when (git-on-branch? hugo-blog-preview-branch)
+    (hugo-blog-run-command "-b" hugo-blog-publish-url)
+    (hugo-blog--commit-all hugo-blog-preview-branch))
+  (with-git-repo hugo-blog-project
+                 (git-checkout hugo-blog-publish-branch)
+                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
+                                (git-checkout hugo-blog-publish-branch)))
+  (hugo-blog--merge-master))
+
+;;;###autoload
+(defun hugo-blog-publish ()
+  "Commits everything and merges develop into master"
+  (interactive)
+  (with-git-repo hugo-blog-project
+  (unless (git-on-branch? hugo-blog-publish-branch)
+    (hugo-blog--switch-to-master))
+    (hugo-blog--merge-master)))
+
 (provide 'hugo-blog-mode)
 
 ;;; hugo-blog-mode.el ends here
