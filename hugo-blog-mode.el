@@ -29,7 +29,7 @@
 
 ;;; Comentary:
 
-;; A little helper package to manage my static blog using hugo
+;; A quick and dirty helper package to manage my static blog using hugo
 
 ;;; Code
 
