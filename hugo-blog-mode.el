@@ -5,7 +5,7 @@
 ;; Author: Yoandy Rodriguez Martinez <yrmartinez@gmail.com>
 ;; Keywords: hugo, blog, tools
 ;; Package: hugo-blog-mode
-;; Version: 20170618.1255
+;; Version: 20171019.1255
 ;; X-Original-Version: 0.1
 
 ;; This file is not part of GNU Emacs
@@ -36,7 +36,6 @@
 (require 'git)
 (require 'url-parse)
 (require 'simple-httpd)
-
 
 (defgroup hugo-blog nil
   "Hugo blog mode customizations"
@@ -86,21 +85,36 @@
   "Runs COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
    Returns the command's output as a string"
   (cd hugo-blog-project)
-  (shell-command-to-string (concat command  " " parameters)))
+  (let ((output (shell-command-to-string
+                 (concat hugo-blog-command
+                         " "
+                         command
+                         " "
+                         parameters))))
+    (if (string-match-p "Error" output)
+        nil
+      output)))
+
+(defun hugo-blog--switch-to-develop ()
+  (when (git-on-branch? hugo-blog-publish-branch)
+    (git-add)
+    (let ((have-stash (git-stash (concat "WIP: Switching to preview "
+                                         (current-time-string)))))
+      (unless (member hugo-blog-preview-branch (git-branches))
+        (git-branch hugo-blog-preview-branch))
+      (git-checkout hugo-blog-preview-branch)
+      (when have-stash
+        (git-stash-pop)))))
 
 (defun hugo-blog--switch-to-preview ()
   "Changes to the preview branch keeping all the changes"
   (cd hugo-blog-project)
   (with-git-repo hugo-blog-project
-  (when (git-on-branch? hugo-blog-publish-branch)
-    (git-add)
-    (let ((have-stash (git-stash (concat "WIP: Switching to preview "
-                                         (current-time-string)))))
-    (unless (member hugo-blog-preview-branch (git-branches))
-      (git-branch hugo-blog-preview-branch))
-    (git-checkout hugo-blog-preview-branch)
-    (when have-stash
-      (git-stash-pop))))))
+                 (hugo-blog--switch-to-develop)
+                 (with-git-repo (concat hugo-blog-project
+                                        (f-path-separator)
+                                        "public")
+                                (hugo-blog--switch-to-develop))))
 
 ;;;###autoload
 (defun hugo-blog-new (archetype)
@@ -108,27 +122,27 @@
   (interactive "sNew content path: ")
   (hugo-blog--switch-to-preview)
   (let ((output (hugo-blog-run-command "new" archetype)))
-    (find-file-existing  (car (split output " ")))))
+    (if output
+        (find-file-existing  (car (split-string output " ")))
+      (error "Command hugo returned an error, check your configuration"))))
 
 ;;;###autoload
 (defun hugo-blog-preview ()
   "Launches a preview HTTP server"
   (interactive)
   (hugo-blog--switch-to-preview)
-  (hugo-blog-run-command  "-b " hugo-blog-preview-url)
-  (when hugo-blog-internal-server
-    (let ((url (url-generic-parse-url hugo-blog-preview-url)))
-      ;; We love CL
-      (setq httpd-root
-            (concat hugo-blog-project
-                    (f-path-separator) "public"))
-      (setq httpd-host (url-host url))
-      (setq httpd-port (url-port url))
-      (httpd-start)
-      (browse-url hugo-blog-preview-url))))
-
-(defun hugo-blog-publish ()
-  (interactive))
+  (if (hugo-blog-run-command  "-b " hugo-blog-preview-url)
+      (when hugo-blog-internal-server
+        (let ((url (url-generic-parse-url hugo-blog-preview-url)))
+          ;; We love CL
+          (setq httpd-root
+                (concat hugo-blog-project
+                        (f-path-separator) "public"))
+          (setq httpd-host (url-host url))
+          (setq httpd-port (url-port url))
+          (httpd-start)
+          (browse-url hugo-blog-preview-url)))
+    (error "Command hugo returned an error, check your configuration")))
 
 (provide 'hugo-blog-mode)
 
