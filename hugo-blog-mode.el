@@ -81,6 +81,9 @@
   `(let ((git-repo ,repo))
      ,@body))
 
+(defsubst hugo-blog-submodule ()
+  (concat hugo-blog-project (f-path-separator) "public"))
+
 (defun hugo-blog-run-command (command parameters)
   "Runs COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
    Returns the command's output as a string"
@@ -111,9 +114,7 @@
   (cd hugo-blog-project)
   (with-git-repo hugo-blog-project
                  (hugo-blog--switch-to-develop)
-                 (with-git-repo (concat hugo-blog-project
-                                        (f-path-separator)
-                                        "public")
+                 (with-git-repo (hugo-blog-submodule)
                                 (hugo-blog--switch-to-develop))))
 
 ;;;###autoload
@@ -135,9 +136,7 @@
       (when hugo-blog-internal-server
         (let ((url (url-generic-parse-url hugo-blog-preview-url)))
           ;; We love CL
-          (setq httpd-root
-                (concat hugo-blog-project
-                        (f-path-separator) "public"))
+          (setq httpd-root (hugo-blog-submodule))
           (setq httpd-host (url-host url))
           (setq httpd-port (url-port url))
           (httpd-start)
@@ -160,7 +159,7 @@
   (with-git-repo hugo-blog-project
                  (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
                                                          (current-time-string)))
-                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
+                 (with-git-repo (hugo-blog-submodule)
                                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
                                                                         (current-time-string))))))
 
@@ -171,7 +170,7 @@
     (hugo-blog--commit-all hugo-blog-preview-branch))
   (with-git-repo hugo-blog-project
                  (git-checkout hugo-blog-publish-branch)
-                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
+                 (with-git-repo (hugo-blog-submodule)
                                 (git-checkout hugo-blog-publish-branch)))
   (hugo-blog--merge-master))
 
