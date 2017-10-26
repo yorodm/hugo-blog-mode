@@ -81,6 +81,12 @@
   `(let ((git-repo ,repo))
      ,@body))
 
+(defmacro with-project-repo (&rest body)
+  `(progn
+     (with-git-repo (hugo-blog-submodule)
+                    ,@body)
+     (with-git-repo hugo-blog-project
+                    ,@body)))
 ;; git.el needs this, badly
 (defun git-modified-files ()
   "Return list of untracked files."
@@ -108,7 +114,7 @@
   "Switches the whole thing into develop"
   (when (git-on-branch? hugo-blog-publish-branch)
     (let ((have-stash (or (git-modified-files)
-                       (git-untracked-files))))
+                          (git-untracked-files))))
      (when have-stash
       (git-add)
       (git-stash (concat "WIP on: " (current-time-string))))
@@ -120,11 +126,8 @@
 
 (defun hugo-blog--switch-to-preview ()
   "Changes to the preview branch keeping all the changes"
-  (cd hugo-blog-project)
-  (with-git-repo hugo-blog-project
-                 (hugo-blog--switch-to-develop)
-                 (with-git-repo (hugo-blog-submodule)
-                                (hugo-blog--switch-to-develop))))
+  (with-project-repo
+   (hugo-blog--switch-to-develop)))
 
 ;;;###autoload
 (defun hugo-blog-new (archetype)
