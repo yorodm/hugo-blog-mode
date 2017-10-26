@@ -81,6 +81,12 @@
   `(let ((git-repo ,repo))
      ,@body))
 
+;; git.el needs this, badly
+(defun git-modified-files ()
+  "Return list of untracked files."
+  (git--lines
+   (git-run "ls-files" "-m" "--exclude-standard")))
+
 (defsubst hugo-blog-submodule ()
   (concat hugo-blog-project (f-path-separator) "public"))
 
@@ -99,15 +105,18 @@
       output)))
 
 (defun hugo-blog--switch-to-develop ()
+  "Switches the whole thing into develop"
   (when (git-on-branch? hugo-blog-publish-branch)
-    (git-add)
-    (let ((have-stash (git-stash (concat "WIP: Switching to preview "
-                                         (current-time-string)))))
-      (unless (member hugo-blog-preview-branch (git-branches))
-        (git-branch hugo-blog-preview-branch))
-      (git-checkout hugo-blog-preview-branch)
-      (when have-stash
-        (git-stash-pop)))))
+    (let ((have-stash (or (git-modified-files)
+                       (git-untracked-files))))
+     (when have-stash
+      (git-add)
+      (git-stash (concat "WIP on: " (current-time-string))))
+    (unless (member hugo-blog-preview-branch (git-branches))
+      (git-branch hugo-blog-preview-branch))
+    (git-checkout hugo-blog-preview-branch)
+    (when have-stash
+      (git-stash-pop)))))
 
 (defun hugo-blog--switch-to-preview ()
   "Changes to the preview branch keeping all the changes"
@@ -143,25 +152,29 @@
           (browse-url hugo-blog-preview-url)))
     (error "Command hugo returned an error, check your configuration")))
 
-(defun hugo-blog--commit-all (branch)
+(defun hugo-blog--commit-all ()
+  "Commits the submodule and then the project"
+  (with-git-repo (hugo-blog-submodule)
+                 (git-add)
+                 (git-commit (concat "Commit on "
+                                     (current-time-string))))
   (with-git-repo hugo-blog-project
-  (when (git-untracked-files)
-    (git-add)
-    (git-commit (concat "Commit on " branch " :" (current-time-string)))
-    (with-git-repo (concat hugo-blog-project (f-path-separator) "public")
-               (git-add)
-               (git-commit (concat "Commit on " branch ":" (current-time-string)))))))
+                 (when (git-untracked-files)
+                   (git-add)
+                   (git-add "public") ;; Let's be really sure
+                   (git-commit (concat "Commit on "
+                                       (current-time-string))))))
 
 (defun hugo-blog--merge-master ()
   "Merges develop into master"
   (when (git-untracked-files)
     (error (concat "There are untracked files in " hugo-blog-publish-branch)))
+  (with-git-repo (hugo-blog-submodule)
+                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
+                                                         (current-time-string))))
   (with-git-repo hugo-blog-project
                  (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                         (current-time-string)))
-                 (with-git-repo (hugo-blog-submodule)
-                                (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                                        (current-time-string))))))
+                                                         (current-time-string)))))
 
 (defun hugo-blog--switch-to-master ()
   "Commits everything into develop and switches back to master"
