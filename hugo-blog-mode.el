@@ -59,10 +59,6 @@
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-executable "hugo"
-  "Hugo binary path"
-  :group 'hugo-blog
-  :type 'string)
 
 (defmacro with-git-repo (repo &rest body)
   "A simple way of not to mess with `git-repo' in `git.el'"
@@ -108,7 +104,7 @@
   (interactive)
   (unless (process-status "hugo")
   (start-process "hugo" hugo-blog-process-buffer
-                 hugo-blog-executable "server"))
+                 hugo-blog-command "server"))
   (with-current-buffer hugo-blog-process-buffer
     (goto-char (point-max))
     (if (re-search-backward "http://localhost:[0-9]+/" nil t)
