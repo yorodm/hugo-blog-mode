@@ -69,12 +69,6 @@
   `(let ((git-repo ,repo))
      ,@body))
 
-(defmacro with-project-repo (&rest body)
-  `(progn
-     (with-git-repo (hugo-blog-submodule)
-                    ,@body)
-     (with-git-repo hugo-blog-project
-                    ,@body)))
 ;; git.el needs this, badly
 (defun git-modified-files ()
   "Return list of untracked files."
@@ -112,10 +106,9 @@
 (defun hugo-blog-preview ()
   "Launches a preview HTTP server"
   (interactive)
-  (when (process-status "hugo")
-    (delete-process "hugo"))
+  (unless (process-status "hugo")
   (start-process "hugo" hugo-blog-process-buffer
-                 hugo-blog-executable "server")
+                 hugo-blog-executable "server"))
   (with-current-buffer hugo-blog-process-buffer
     (goto-char (point-max))
     (if (re-search-backward "http://localhost:[0-9]+/" nil t)
@@ -135,25 +128,12 @@
                    (git-commit (concat "Commit on "
                                        (current-time-string))))))
 
-(defun hugo-blog--switch-to-master ()
-  "Commits everything into develop and switches back to master"
-  (when (git-on-branch? hugo-blog-preview-branch)
-    (hugo-blog-run-command "-b" hugo-blog-publish-url)
-    (hugo-blog--commit-all hugo-blog-preview-branch))
-  (with-git-repo hugo-blog-project
-                 (git-checkout hugo-blog-publish-branch)
-                 (with-git-repo (hugo-blog-submodule)
-                                (git-checkout hugo-blog-publish-branch)))
-  (hugo-blog--merge-master))
-
 ;;;###autoload
 (defun hugo-blog-publish ()
   "Commits everything and merges develop into master"
   (interactive)
-  (with-git-repo hugo-blog-project
-  (unless (git-on-branch? hugo-blog-publish-branch)
-    (hugo-blog--switch-to-master))
-    (hugo-blog--merge-master)))
+  (when (yes-or-no-p "This will commit changes, are you sure? ")
+   (hugo-blog-commit-all)))
 
 (provide 'hugo-blog-mode)
 
