@@ -56,23 +56,13 @@
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-preview-url ""
-  "Blog's local URL"
+(defcustom hugo-blog-process-buffer "*hugo-blog-process*"
+  "Hugo blog process buffer"
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-internal-server t
-  "Non nil means use internal server for preview"
-  :group 'hugo-blog
-  :type 'boolean)
-
-(defcustom hugo-blog-publish-branch "master"
-  "Git branch of published mode"
-  :group 'hugo-blog
-  :type 'string)
-
-(defcustom hugo-blog-preview-branch "develop"
-  "Git branch of preview mode"
+(defcustom hugo-blog-executable "hugo"
+  "Hugo binary path"
   :group 'hugo-blog
   :type 'string)
 
@@ -110,25 +100,6 @@
         nil
       output)))
 
-(defun hugo-blog--switch-to-develop ()
-  "Switches the whole thing into develop"
-  (when (git-on-branch? hugo-blog-publish-branch)
-    (let ((have-stash (or (git-modified-files)
-                          (git-untracked-files))))
-     (when have-stash
-      (git-add)
-      (git-stash (concat "WIP on: " (current-time-string))))
-    (unless (member hugo-blog-preview-branch (git-branches))
-      (git-branch hugo-blog-preview-branch))
-    (git-checkout hugo-blog-preview-branch)
-    (when have-stash
-      (git-stash-pop)))))
-
-(defun hugo-blog--switch-to-preview ()
-  "Changes to the preview branch keeping all the changes"
-  (with-project-repo
-   (hugo-blog--switch-to-develop)))
-
 ;;;###autoload
 (defun hugo-blog-new (archetype)
   "Creates new content in your hugo site"
@@ -143,17 +114,15 @@
 (defun hugo-blog-preview ()
   "Launches a preview HTTP server"
   (interactive)
-  (hugo-blog--switch-to-preview)
-  (if (hugo-blog-run-command  "-b " hugo-blog-preview-url)
-      (when hugo-blog-internal-server
-        (let ((url (url-generic-parse-url hugo-blog-preview-url)))
-          ;; We love CL
-          (setq httpd-root (hugo-blog-submodule))
-          (setq httpd-host (url-host url))
-          (setq httpd-port (url-port url))
-          (httpd-start)
-          (browse-url hugo-blog-preview-url)))
-    (error "Command hugo returned an error, check your configuration")))
+  (when (process-status "hugo")
+    (delete-process "hugo"))
+  (start-process "hugo" hugo-blog-process-buffer
+                 hugo-blog-executable "server")
+  (with-current-buffer hugo-blog-process-buffer
+    (goto-char (point-max))
+    (if (re-search-backward "http://localhost:[0-9]+/" nil t)
+        (browse-url (match-string 0))
+      (error "Error executing hugo"))))
 
 (defun hugo-blog--commit-all ()
   "Commits the submodule and then the project"
@@ -167,17 +136,6 @@
                    (git-add "public") ;; Let's be really sure
                    (git-commit (concat "Commit on "
                                        (current-time-string))))))
-
-(defun hugo-blog--merge-master ()
-  "Merges develop into master"
-  (when (git-untracked-files)
-    (error (concat "There are untracked files in " hugo-blog-publish-branch)))
-  (with-git-repo (hugo-blog-submodule)
-                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                         (current-time-string))))
-  (with-git-repo hugo-blog-project
-                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                         (current-time-string)))))
 
 (defun hugo-blog--switch-to-master ()
   "Commits everything into develop and switches back to master"
