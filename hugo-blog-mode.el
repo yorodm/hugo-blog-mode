@@ -6,7 +6,7 @@
 ;; Keywords: hugo, blog, tools
 ;; Package: hugo-blog-mode
 ;; Version: 20171019.1255
-;; X-Original-Version: 0.1
+;; X-Original-Version: 0.9
 
 ;; This file is not part of GNU Emacs
 
