@@ -34,8 +34,6 @@
 ;;; Code
 
 (require 'git)
-(require 'url-parse)
-(require 'simple-httpd)
 
 (defgroup hugo-blog nil
   "Hugo blog mode customizations"
