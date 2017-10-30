@@ -114,13 +114,13 @@
 
 (defun hugo-blog--commit-all ()
   "Commits the submodule and then the project"
-  (with-git-repo (hugo-blog-submodule)
-                 (when (git-untracked-files)
+  (with-git-repo  (hugo-blog-submodule)
+                 (when (git-modified-files)
                    (git-add)
                    (git-commit (concat "Commit on "
                                        (current-time-string)))))
-  (with-git-repo hugo-blog-project
-                 (when (git-untracked-files)
+  (with-git-repo  hugo-blog-project
+                 (when (git-modified-files)
                    (git-add)
                    (git-add "public") ;; Let's be really sure
                    (git-commit (concat "Commit on "
