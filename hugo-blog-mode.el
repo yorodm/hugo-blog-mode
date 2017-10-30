@@ -115,9 +115,10 @@
 (defun hugo-blog--commit-all ()
   "Commits the submodule and then the project"
   (with-git-repo (hugo-blog-submodule)
-                 (git-add)
-                 (git-commit (concat "Commit on "
-                                     (current-time-string))))
+                 (when (git-untracked-files)
+                   (git-add)
+                   (git-commit (concat "Commit on "
+                                       (current-time-string)))))
   (with-git-repo hugo-blog-project
                  (when (git-untracked-files)
                    (git-add)
