@@ -131,7 +131,8 @@
   "Commits everything and merges develop into master"
   (interactive)
   (when (yes-or-no-p "This will commit changes, are you sure? ")
-   (hugo-blog-commit-all)))
+    (hugo-blog-run-command "-b" hugo-blog-publish-url)
+    (hugo-blog--commit-all)))
 
 (provide 'hugo-blog-mode)
 
