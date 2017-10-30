@@ -103,6 +103,7 @@
   "Launches a preview HTTP server"
   (interactive)
   (unless (process-status "hugo")
+  (cd hugo-blog-project)
   (start-process "hugo" hugo-blog-process-buffer
                  hugo-blog-command "server"))
   (with-current-buffer hugo-blog-process-buffer
