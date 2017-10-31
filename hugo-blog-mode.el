@@ -6,7 +6,7 @@
 ;; Keywords: hugo, blog, tools
 ;; Package: hugo-blog-mode
 ;; Version: 20171019.1255
-;; X-Original-Version: 0.1
+;; X-Original-Version: 0.9
 
 ;; This file is not part of GNU Emacs
 
@@ -34,8 +34,6 @@
 ;;; Code
 
 (require 'git)
-(require 'url-parse)
-(require 'simple-httpd)
 
 (defgroup hugo-blog nil
   "Hugo blog mode customizations"
@@ -56,30 +54,25 @@
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-preview-url ""
-  "Blog's local URL"
+(defcustom hugo-blog-process-buffer "*hugo-blog-process*"
+  "Hugo blog process buffer"
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-internal-server t
-  "Non nil means use internal server for preview"
-  :group 'hugo-blog
-  :type 'boolean)
-
-(defcustom hugo-blog-publish-branch "master"
-  "Git branch of published mode"
-  :group 'hugo-blog
-  :type 'string)
-
-(defcustom hugo-blog-preview-branch "develop"
-  "Git branch of preview mode"
-  :group 'hugo-blog
-  :type 'string)
 
 (defmacro with-git-repo (repo &rest body)
   "A simple way of not to mess with `git-repo' in `git.el'"
   `(let ((git-repo ,repo))
      ,@body))
+
+;; git.el needs this, badly
+(defun git-modified-files ()
+  "Return list of untracked files."
+  (git--lines
+   (git-run "ls-files" "-m" "--exclude-standard")))
+
+(defsubst hugo-blog-submodule ()
+  (concat hugo-blog-project (f-path-separator) "public"))
 
 (defun hugo-blog-run-command (command parameters)
   "Runs COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
@@ -95,27 +88,6 @@
         nil
       output)))
 
-(defun hugo-blog--switch-to-develop ()
-  (when (git-on-branch? hugo-blog-publish-branch)
-    (git-add)
-    (let ((have-stash (git-stash (concat "WIP: Switching to preview "
-                                         (current-time-string)))))
-      (unless (member hugo-blog-preview-branch (git-branches))
-        (git-branch hugo-blog-preview-branch))
-      (git-checkout hugo-blog-preview-branch)
-      (when have-stash
-        (git-stash-pop)))))
-
-(defun hugo-blog--switch-to-preview ()
-  "Changes to the preview branch keeping all the changes"
-  (cd hugo-blog-project)
-  (with-git-repo hugo-blog-project
-                 (hugo-blog--switch-to-develop)
-                 (with-git-repo (concat hugo-blog-project
-                                        (f-path-separator)
-                                        "public")
-                                (hugo-blog--switch-to-develop))))
-
 ;;;###autoload
 (defun hugo-blog-new (archetype)
   "Creates new content in your hugo site"
@@ -130,59 +102,37 @@
 (defun hugo-blog-preview ()
   "Launches a preview HTTP server"
   (interactive)
-  (hugo-blog--switch-to-preview)
-  (if (hugo-blog-run-command  "-b " hugo-blog-preview-url)
-      (when hugo-blog-internal-server
-        (let ((url (url-generic-parse-url hugo-blog-preview-url)))
-          ;; We love CL
-          (setq httpd-root
-                (concat hugo-blog-project
-                        (f-path-separator) "public"))
-          (setq httpd-host (url-host url))
-          (setq httpd-port (url-port url))
-          (httpd-start)
-          (browse-url hugo-blog-preview-url)))
-    (error "Command hugo returned an error, check your configuration")))
+  (unless (process-status "hugo")
+  (cd hugo-blog-project)
+  (start-process "hugo" hugo-blog-process-buffer
+                 hugo-blog-command "server"))
+  (with-current-buffer hugo-blog-process-buffer
+    (goto-char (point-max))
+    (if (re-search-backward "http://localhost:[0-9]+/" nil t)
+        (browse-url (match-string 0))
+      (error "Error executing hugo"))))
 
-(defun hugo-blog--commit-all (branch)
-  (with-git-repo hugo-blog-project
-  (when (git-untracked-files)
-    (git-add)
-    (git-commit (concat "Commit on " branch " :" (current-time-string)))
-    (with-git-repo (concat hugo-blog-project (f-path-separator) "public")
-               (git-add)
-               (git-commit (concat "Commit on " branch ":" (current-time-string)))))))
-
-(defun hugo-blog--merge-master ()
-  "Merges develop into master"
-  (when (git-untracked-files)
-    (error (concat "There are untracked files in " hugo-blog-publish-branch)))
-  (with-git-repo hugo-blog-project
-                 (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                         (current-time-string)))
-                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
-                                (git-run "merge" "--no-ff" "-m" (concat "Merge develop on:  "
-                                                                        (current-time-string))))))
-
-(defun hugo-blog--switch-to-master ()
-  "Commits everything into develop and switches back to master"
-  (when (git-on-branch? hugo-blog-preview-branch)
-    (hugo-blog-run-command "-b" hugo-blog-publish-url)
-    (hugo-blog--commit-all hugo-blog-preview-branch))
-  (with-git-repo hugo-blog-project
-                 (git-checkout hugo-blog-publish-branch)
-                 (with-git-repo (concat hugo-blog-project (f-separator) "public")
-                                (git-checkout hugo-blog-publish-branch)))
-  (hugo-blog--merge-master))
+(defun hugo-blog--commit-all ()
+  "Commits the submodule and then the project"
+  (with-git-repo  (hugo-blog-submodule)
+                 (when (git-modified-files)
+                   (git-add)
+                   (git-commit (concat "Commit on "
+                                       (current-time-string)))))
+  (with-git-repo  hugo-blog-project
+                 (when (git-modified-files)
+                   (git-add)
+                   (git-add "public") ;; Let's be really sure
+                   (git-commit (concat "Commit on "
+                                       (current-time-string))))))
 
 ;;;###autoload
 (defun hugo-blog-publish ()
   "Commits everything and merges develop into master"
   (interactive)
-  (with-git-repo hugo-blog-project
-  (unless (git-on-branch? hugo-blog-publish-branch)
-    (hugo-blog--switch-to-master))
-    (hugo-blog--merge-master)))
+  (when (yes-or-no-p "This will commit changes, are you sure? ")
+    (hugo-blog-run-command "-b" hugo-blog-publish-url)
+    (hugo-blog--commit-all)))
 
 (provide 'hugo-blog-mode)
 
