@@ -106,6 +106,7 @@
   (cd hugo-blog-project)
   (start-process "hugo" hugo-blog-process-buffer
                  hugo-blog-command "server"))
+  (sleep-for 5)
   (with-current-buffer hugo-blog-process-buffer
     (goto-char (point-max))
     (if (re-search-backward "http://localhost:[0-9]+/" nil t)
