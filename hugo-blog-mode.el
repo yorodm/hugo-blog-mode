@@ -92,7 +92,7 @@
 (defun hugo-blog-new (archetype)
   "Creates new content in your hugo site"
   (interactive "sNew content path: ")
-  (hugo-blog--switch-to-preview)
+  (cd hugo-blog-project)
   (let ((output (hugo-blog-run-command "new" archetype)))
     (if output
         (find-file-existing  (car (split-string output " ")))
