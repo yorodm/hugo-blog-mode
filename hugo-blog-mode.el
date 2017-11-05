@@ -49,11 +49,6 @@
   :group 'hugo-blog
   :type 'string)
 
-(defcustom hugo-blog-publish-url ""
-  "Blog's URL"
-  :group 'hugo-blog
-  :type 'string)
-
 (defcustom hugo-blog-process-buffer "*hugo-blog-process*"
   "Hugo blog process buffer"
   :group 'hugo-blog
@@ -129,10 +124,11 @@
 
 ;;;###autoload
 (defun hugo-blog-publish ()
-  "Commits everything and merges develop into master"
+  "Generates the site and commits everything"
   (interactive)
+  (save-some-buffers) ;; avoid commiting emacs weird files
   (when (yes-or-no-p "This will commit changes, are you sure? ")
-    (hugo-blog-run-command "-b" hugo-blog-publish-url)
+    (hugo-blog-run-command)
     (hugo-blog--commit-all)))
 
 (provide 'hugo-blog-mode)
