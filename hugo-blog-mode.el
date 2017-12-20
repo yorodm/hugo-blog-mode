@@ -128,7 +128,7 @@
   (interactive)
   (save-some-buffers) ;; avoid commiting emacs weird files
   (when (yes-or-no-p "This will commit changes, are you sure? ")
-    (hugo-blog-run-command "--noChmod" "--noTimes")
+    (hugo-blog-run-command "--noChmod" "--noTimes" "--ignoreCache")
     (hugo-blog--commit-all)))
 
 (provide 'hugo-blog-mode)
