@@ -27,11 +27,11 @@
 ;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;; Boston, MA 02111-1307, USA.
 
-;;; Comentary:
+;;; Commentary:
 
 ;; A quick and dirty helper package to manage my static blog using hugo
 
-;;; Code
+;;; Code:
 
 (require 'git)
 
@@ -40,23 +40,23 @@
   :group 'tools)
 
 (defcustom hugo-blog-command "hugo"
-  "Path to hugo's executable "
+  "Path to hugo's executable."
   :group 'hugo-blog
   :type 'string)
 
 (defcustom hugo-blog-project ""
-  "Blog directory project "
+  "Blog directory project."
   :group 'hugo-blog
   :type 'string)
 
 (defcustom hugo-blog-process-buffer "*hugo-blog-process*"
-  "Hugo blog process buffer"
+  "Hugo blog process buffer."
   :group 'hugo-blog
   :type 'string)
 
 
 (defmacro with-git-repo (repo &rest body)
-  "A simple way of not to mess with `git-repo' in `git.el'"
+  "Run BODY using git repository REPO."
   `(let ((git-repo ,repo))
      ,@body))
 
@@ -67,11 +67,12 @@
    (git-run "ls-files" "-m" "--exclude-standard")))
 
 (defsubst hugo-blog-submodule ()
+  "Inline function to get the submodule."
   (concat hugo-blog-project (f-path-separator) "public"))
 
 (defun hugo-blog-run-command (command parameters)
-  "Runs COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
-   Returns the command's output as a string"
+  "Run COMMAND with PARAMETERS with `hugo-blog-project' as working directory.
+Returns the command's output as a string"
   (cd hugo-blog-project)
   (let ((output (shell-command-to-string
                  (concat hugo-blog-command
@@ -84,23 +85,27 @@
       output)))
 
 ;;;###autoload
-(defun hugo-blog-new (archetype)
-  "Creates new content in your hugo site"
+(defun hugo-blog-new (path)
+  "Create new content in PATH."
   (interactive "sNew content path: ")
   (cd hugo-blog-project)
-  (let ((output (hugo-blog-run-command "new" archetype)))
+  (let ((output (hugo-blog-run-command "new" path)))
     (if output
         (find-file-existing  (car (split-string output " ")))
       (error "Command hugo returned an error, check your configuration"))))
 
 ;;;###autoload
-(defun hugo-blog-preview ()
-  "Launches a preview HTTP server"
-  (interactive)
+(defun hugo-blog-preview (arg)
+  "Launches a preview HTTP server. If ARG is provided also render drafts."
+  (interactive "P")
   (unless (process-status "hugo")
-  (cd hugo-blog-project)
-  (start-process "hugo" hugo-blog-process-buffer
-                 hugo-blog-command "server"))
+    (cd hugo-blog-project)
+  (when arg
+    (start-process "hugo" hugo-blog-process-buffer
+                   hugo-blog-command "-D" "server"))
+  (unless arg
+    (start-process "hugo" hugo-blog-process-buffer
+                   hugo-blog-command "server")))
   (sleep-for 5)
   (with-current-buffer hugo-blog-process-buffer
     (goto-char (point-max))
@@ -109,7 +114,7 @@
       (error "Error executing hugo"))))
 
 (defun hugo-blog--commit-all ()
-  "Commits the submodule and then the project"
+  "Commits the submodule and then the project."
   (with-git-repo  (hugo-blog-submodule)
                  (when (git-modified-files)
                    (git-add)
@@ -124,7 +129,7 @@
 
 ;;;###autoload
 (defun hugo-blog-publish ()
-  "Generates the site and commits everything"
+  "Generate the site and commit everything."
   (interactive)
   (save-some-buffers) ;; avoid commiting emacs weird files
   (when (yes-or-no-p "This will commit changes, are you sure? ")
