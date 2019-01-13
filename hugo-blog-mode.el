@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2017 Yoandy Rodriguez Martinez
 
-;; Author: Yoandy Rodriguez Martinez <yrmartinez@gmail.com>
+;; Author: Yoandy Rodriguez Martinez <yoandy.rmartinez@gmail.com>
 ;; Keywords: hugo, blog, tools
 ;; Package: hugo-blog-mode
 ;; Version: 20171019.1255
