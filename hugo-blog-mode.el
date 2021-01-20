@@ -88,9 +88,8 @@ Returns the command's output as a string"
 (defun hugo-blog-new ()
   "Create new content in PATH."
   (interactive)
-  (cd hugo-blog-project)
   (let ( (path (read-file-name "Enter file name:")))
-  (let ((output (hugo-blog-run-command "new" path)))
+  (let ((output (hugo-blog-run-command "new" (expand-file-name path))))
     (if output
         (find-file-existing  (car (split-string output " ")))
       (error "Command hugo returned an error, check your configuration")))))
